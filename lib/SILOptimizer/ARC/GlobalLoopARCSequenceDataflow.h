@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -72,6 +72,9 @@ class LoopARCSequenceDataflowEvaluator {
   /// Stashed information for each region.
   llvm::DenseMap<const LoopRegion *, ARCRegionState *> RegionStateInfo;
 
+  /// Set of unmatched RefCountInsts
+  llvm::DenseSet<SILInstruction *> UnmatchedRefCountInsts;
+
 public:
   LoopARCSequenceDataflowEvaluator(
       SILFunction &F, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
@@ -108,6 +111,10 @@ public:
   /// Remove \p I from the interesting instruction list of its parent block.
   void removeInterestingInst(SILInstruction *I);
 
+  /// Compute if a RefCountInst was unmatched and populate the persistent
+  /// UnmatchedRefCountInsts set.
+  void saveMatchingInfo(const LoopRegion *R);
+
   /// Clear the folding node set of the set factory we have stored internally.
   void clearSetFactory() {
     SetFactory.clear();
@@ -134,6 +141,8 @@ private:
   bool processLoopTopDown(const LoopRegion *R);
   bool processLoopBottomUp(const LoopRegion *R,
                            bool FreezeOwnedArgEpilogueReleases);
+
+  void dumpDataflowResults();
 };
 
 } // end swift namespace

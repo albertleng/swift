@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -51,6 +51,10 @@ public:
     return ObjCHasOpaqueISAs;
   }
 
+  bool canUseSwiftAsyncContextAddrIntrinsic() const {
+    return UsableSwiftAsyncContextAddrIntrinsic;
+  }
+
   /// The target's object format type.
   llvm::Triple::ObjectFormatType OutputObjectFormat;
   
@@ -66,7 +70,12 @@ public:
   /// used for Swift value layout when a reference type may reference ObjC
   /// objects.
   SpareBitVector ObjCPointerReservedBits;
-  
+
+  /// These bits, if set, indicate that a Builtin.BridgeObject value is holding
+  /// an Objective-C object.
+  SpareBitVector IsObjCPointerBit;
+
+
   /// The alignment of heap objects.  By default, assume pointer alignment.
   Alignment HeapObjectAlignment;
   
@@ -78,6 +87,11 @@ public:
   ///
   /// Changes to this must be kept in sync with swift/Runtime/Metadata.h.
   uint64_t LeastValidPointerValue;
+
+  /// Poison sentinel value recognized by LLDB as a former reference to a
+  /// potentially deinitialized object. It uses no spare bits and cannot point
+  /// to readable memory.
+  uint64_t ReferencePoisonDebugValue;
 
   /// The maximum number of scalars that we allow to be returned directly.
   unsigned MaxScalarsForDirectResult = 3;
@@ -95,6 +109,12 @@ public:
   /// The value stored in a Builtin.once predicate to indicate that an
   /// initialization has already happened, if known.
   Optional<int64_t> OnceDonePredicateValue = None;
+  
+  /// True if `swift_retain` and `swift_release` are no-ops when passed
+  /// "negative" pointer values.
+  bool SwiftRetainIgnoresNegativeValues = false;
+
+  bool UsableSwiftAsyncContextAddrIntrinsic = false;
 };
 
 }

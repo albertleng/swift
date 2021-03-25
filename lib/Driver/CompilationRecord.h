@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,8 +19,8 @@ namespace swift {
 namespace driver {
 namespace compilation_record {
 
-/// Compilation record files (.swiftdeps files) are YAML files composed of these
-/// top-level keys.
+/// Compilation record files (-master.swiftdeps files) are YAML files composed
+/// of these top-level keys.
 enum class TopLevelKey {
   /// The key for the Swift compiler version used to produce the compilation
   /// record.
@@ -59,12 +59,12 @@ inline static StringRef getName(TopLevelKey Key) {
 inline static StringRef
 getIdentifierForInputInfoStatus(CompileJobAction::InputInfo::Status Status) {
   switch (Status) {
-  case CompileJobAction::InputInfo::UpToDate:
+  case CompileJobAction::InputInfo::Status::UpToDate:
     return "";
-  case CompileJobAction::InputInfo::NewlyAdded:
-  case CompileJobAction::InputInfo::NeedsCascadingBuild:
+  case CompileJobAction::InputInfo::Status::NewlyAdded:
+  case CompileJobAction::InputInfo::Status::NeedsCascadingBuild:
     return "!dirty";
-  case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
+  case CompileJobAction::InputInfo::Status::NeedsNonCascadingBuild:
     return "!private";
   }
 
@@ -76,11 +76,11 @@ getIdentifierForInputInfoStatus(CompileJobAction::InputInfo::Status Status) {
 /// compilation record file (.swiftdeps file).
 inline static Optional<CompileJobAction::InputInfo::Status>
 getInfoStatusForIdentifier(StringRef Identifier) {
-  return llvm::StringSwitch<Optional<
-      CompileJobAction::InputInfo::Status>>(Identifier)
-    .Case("", CompileJobAction::InputInfo::UpToDate)
-    .Case("!dirty", CompileJobAction::InputInfo::NeedsCascadingBuild)
-    .Case("!private", CompileJobAction::InputInfo::NeedsNonCascadingBuild)
+  using InputStatus = CompileJobAction::InputInfo::Status;
+  return llvm::StringSwitch<Optional<InputStatus>>(Identifier)
+    .Case("", InputStatus::UpToDate)
+    .Case("!dirty", InputStatus::NeedsCascadingBuild)
+    .Case("!private", InputStatus::NeedsNonCascadingBuild)
     .Default(None);
 }
 

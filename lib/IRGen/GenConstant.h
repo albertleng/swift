@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,6 +27,9 @@ namespace irgen {
 /// Construct a ConstantInt from an IntegerLiteralInst.
 llvm::Constant *emitConstantInt(IRGenModule &IGM, IntegerLiteralInst *ILI);
 
+/// Construct a zero from a zero initializer BuiltinInst.
+llvm::Constant *emitConstantZero(IRGenModule &IGM, BuiltinInst *Bi);
+
 /// Construct a ConstantFP from a FloatLiteralInst.
 llvm::Constant *emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI);
 
@@ -34,11 +37,13 @@ llvm::Constant *emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI);
 llvm::Constant *emitAddrOfConstantString(IRGenModule &IGM,
                                          StringLiteralInst *SLI);
 
-/// Construct a struct literal from a StructInst containing constant values.
-llvm::Constant *emitConstantStruct(IRGenModule &IGM, StructInst *SI);
+/// Construct a constant from a SILValue containing constant values.
+llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue value);
 
-/// Construct a struct literal from a TupleInst containing constant values.
-llvm::Constant *emitConstantTuple(IRGenModule &IGM, TupleInst *TI);
+/// Construct an object (with a HeapObject header) from an ObjectInst
+/// containing constant values.
+llvm::Constant *emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
+                                   StructLayout *ClassLayout);
 }
 }
 

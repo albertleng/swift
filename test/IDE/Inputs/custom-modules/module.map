@@ -35,6 +35,11 @@ module ImportAsMember {
   module C {
     requires objc
     header "ImportAsMemberC.h"
+    export *
+  }
+
+  module APINotes {
+    header "ImportAsMemberAPINotes.h"
   }
 
   module Class {
@@ -47,11 +52,6 @@ module IAMError {
   export *
   requires objc
   header "ImportAsMemberError.h"
-}
-
-module InferImportAsMember {
-  export *
-  header "InferImportAsMember.h"
 }
 
 module CompatibilityAlias {

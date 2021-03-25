@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,8 +12,12 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+
+#include "llvm/Support/Host.h"
 
 namespace swift {
 namespace unittest {
@@ -25,7 +29,9 @@ namespace unittest {
 class TestContextBase {
 public:
   LangOptions LangOpts;
+  TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
+  ClangImporterOptions ClangImporterOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 
@@ -44,19 +50,33 @@ class TestContext : public TestContextBase {
   SourceFile *FileForLookups;
 
 public:
-  ASTContext Ctx;
+  ASTContext &Ctx;
 
   TestContext(ShouldDeclareOptionalTypes optionals = DoNotDeclareOptionalTypes);
 
   template <typename Nominal>
-  Nominal *makeNominal(StringRef name,
-                       GenericParamList *genericParams = nullptr) {
+  typename std::enable_if<!std::is_same<Nominal, swift::ClassDecl>::value,
+                          Nominal *>::type
+  makeNominal(StringRef name, GenericParamList *genericParams = nullptr) {
     auto result = new (Ctx) Nominal(SourceLoc(), Ctx.getIdentifier(name),
                                     SourceLoc(), /*inherited*/{},
                                     genericParams, FileForLookups);
-    result->setAccessibility(Accessibility::Internal);
+    result->setAccess(AccessLevel::Internal);
     return result;
   }
+
+  template <typename Nominal>
+  typename std::enable_if<std::is_same<Nominal, swift::ClassDecl>::value,
+                          swift::ClassDecl *>::type
+  makeNominal(StringRef name, GenericParamList *genericParams = nullptr) {
+    auto result = new (Ctx) ClassDecl(SourceLoc(), Ctx.getIdentifier(name),
+                                      SourceLoc(), /*inherited*/{},
+                                      genericParams, FileForLookups,
+                                      /*isActor*/false);
+    result->setAccess(AccessLevel::Internal);
+    return result;
+  }
+
 };
 
 } // end namespace unittest

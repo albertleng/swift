@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,6 +15,7 @@
 
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
@@ -23,12 +24,21 @@ namespace swift {
 /// a particular declaration can be accessed.
 class AccessScope {
   /// The declaration context (if not public) along with a bit saying
-  /// whether this scope is private (or not).
+  /// whether this scope is private, SPI or not.
+  /// If the declaration context is set, the bit means that the scope is
+  /// private or not. If the declaration context is null, the bit means that
+  /// this scope is SPI or not.
   llvm::PointerIntPair<const DeclContext *, 1, bool> Value;
+
 public:
   AccessScope(const DeclContext *DC, bool isPrivate = false);
 
-  static AccessScope getPublic() { return AccessScope(nullptr); }
+  static AccessScope getPublic() { return AccessScope(nullptr, false); }
+
+  /// Check if private access is allowed. This is a lexical scope check in Swift
+  /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
+  /// also allow access.
+  static bool allowsPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC);
 
   /// Returns nullptr if access scope is public.
   const DeclContext *getDeclContext() const { return Value.getPointer(); }
@@ -40,29 +50,30 @@ public:
   }
 
   bool isPublic() const { return !Value.getPointer(); }
-  bool isPrivate() const { return Value.getInt(); }
+  bool isPrivate() const { return Value.getPointer() && Value.getInt(); }
   bool isFileScope() const;
+  bool isInternal() const;
 
   /// Returns true if this is a child scope of the specified other access scope.
   ///
   /// \see DeclContext::isChildContextOf
   bool isChildOf(AccessScope AS) const {
     if (!isPublic() && !AS.isPublic())
-      return getDeclContext()->isChildContextOf(AS.getDeclContext());
+      return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
     if (isPublic() && AS.isPublic())
       return false;
     return AS.isPublic();
   }
 
   /// Returns the associated access level for diagnostic purposes.
-  Accessibility accessibilityForDiagnostics() const;
+  AccessLevel accessLevelForDiagnostics() const;
 
   /// Returns the minimum access level required to access
   /// associated DeclContext for diagnostic purposes.
-  Accessibility requiredAccessibilityForDiagnostics() const {
+  AccessLevel requiredAccessForDiagnostics() const {
     return isFileScope()
-      ? Accessibility::FilePrivate
-      : accessibilityForDiagnostics();
+      ? AccessLevel::FilePrivate
+      : accessLevelForDiagnostics();
   }
 
   /// Returns the narrowest access scope if this and the specified access scope
@@ -81,6 +92,7 @@ public:
     return None;
   }
 
+  SWIFT_DEBUG_DUMP;
 };
 
 } // end namespace swift

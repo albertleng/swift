@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,11 +39,9 @@ struct ARCPairingContext {
 
   ARCPairingContext(SILFunction &F, RCIdentityFunctionInfo *RCIA)
       : F(F), DecToIncStateMap(), IncToDecStateMap(), RCIA(RCIA) {}
-  bool performMatching(llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
-                       llvm::SmallVectorImpl<SILInstruction *> &DeadInsts);
+  bool performMatching(llvm::SmallVectorImpl<SILInstruction *> &DeadInsts);
 
   void optimizeMatchingSet(ARCMatchingSet &MatchSet,
-                           llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
                            llvm::SmallVectorImpl<SILInstruction *> &DeadInsts);
 };
 
@@ -68,10 +66,8 @@ struct BlockARCPairingContext {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
     Evaluator.clear();
 
-    llvm::SmallVector<SILInstruction *, 8> NewInsts;
     llvm::SmallVector<SILInstruction *, 8> DeadInsts;
-    bool MatchedPair = Context.performMatching(NewInsts, DeadInsts);
-    NewInsts.clear();
+    bool MatchedPair = Context.performMatching(DeadInsts);
     while (!DeadInsts.empty())
       DeadInsts.pop_back_val()->eraseFromParent();
     return NestingDetected && MatchedPair;

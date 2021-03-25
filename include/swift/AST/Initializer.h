@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #define SWIFT_INITIALIZER_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Decl.h"
 
 namespace swift {
 class PatternBindingDecl;
@@ -32,6 +33,9 @@ enum class InitializerKind : uint8_t {
 
   /// A function's default argument expression.
   DefaultArgument,
+
+  /// A property wrapper initialization expression.
+  PropertyWrapper,
 };
 
 /// An Initializer is a kind of DeclContext used for expressions that
@@ -40,9 +44,9 @@ enum class InitializerKind : uint8_t {
 /// Generally, Initializers are created lazily, as most initializers
 /// don't really require DeclContexts.
 class Initializer : public DeclContext {
-  unsigned Kind : 1;
+  unsigned Kind : 2;
 protected:
-  unsigned SpareBits : 31;
+  unsigned SpareBits : 30;
   
   Initializer(InitializerKind kind, DeclContext *parent)
     : DeclContext(DeclContextKind::Initializer, parent),
@@ -69,17 +73,21 @@ public:
 class PatternBindingInitializer : public Initializer {
   PatternBindingDecl *Binding;
 
+  // created lazily for 'self' lookup from lazy property initializer
+  ParamDecl *SelfParam;
+
   friend class ASTContext; // calls reset on unused contexts
 
   void reset(DeclContext *parent) {
     setParent(parent);
     Binding = nullptr;
+    SelfParam = nullptr;
   }
 
 public:
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
-      Binding(nullptr) {
+      Binding(nullptr), SelfParam(nullptr) {
     SpareBits = 0;
   }
  
@@ -93,6 +101,13 @@ public:
   PatternBindingDecl *getBinding() const { return Binding; }
 
   unsigned getBindingIndex() const { return SpareBits; }
+
+  /// If this initializes a single @lazy variable, return it.
+  VarDecl *getInitializedLazyVar() const;
+
+  /// If this initializes a single @lazy variable, lazily create a self
+  /// declaration for it to refer to.
+  ParamDecl *getImplicitSelfDecl() const;
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
@@ -138,12 +153,6 @@ public:
 /// A default argument expression.  The parent context is the function
 /// (possibly a closure) for which this is a default argument.
 class DefaultArgumentInitializer : public Initializer {
-  friend class ASTContext; // calls reset on unused contexts
-  void reset(DeclContext *parent, unsigned index) {
-    setParent(parent);
-    SpareBits = index;
-  }
-
 public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {
@@ -155,8 +164,8 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(AbstractFunctionDecl *parent);
-  
+  void changeFunction(DeclContext *parent, ParameterList *paramLists);
+
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
       return classof(init);
@@ -187,6 +196,39 @@ public:
       return LDC->getLocalDeclContextKind() ==
         LocalDeclContextKind::DefaultArgumentInitializer;
     return false;
+  }
+};
+
+/// A property wrapper initialization expression.  The parent context is the
+/// function or closure which owns the property wrapper.
+class PropertyWrapperInitializer : public Initializer {
+public:
+  enum class Kind {
+    WrappedValue,
+    ProjectedValue
+  };
+
+private:
+  ParamDecl *param;
+  Kind kind;
+
+public:
+  explicit PropertyWrapperInitializer(DeclContext *parent, ParamDecl *param, Kind kind)
+      : Initializer(InitializerKind::PropertyWrapper, parent),
+        param(param), kind(kind) {}
+
+  ParamDecl *getParam() const { return param; }
+
+  Kind getKind() const { return kind; }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto init = dyn_cast<Initializer>(DC))
+      return classof(init);
+    return false;
+  }
+
+  static bool classof(const Initializer *I) {
+    return I->getInitializerKind() == InitializerKind::PropertyWrapper;
   }
 };
   

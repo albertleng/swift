@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// XFAIL: OS=openbsd
 
 import StdlibUnittest
 
@@ -81,7 +82,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
     withUnsafeMutablePointerToElements {
       (x: UnsafeMutablePointer<T>) -> () in
       for i in stride(from: 0, to: count, by: 2) {
-        (x + i).deinitialize()
+        (x + i).deinitialize(count: 1)
       }
     }
   }
@@ -104,7 +105,7 @@ class MyBuffer<T> {
     Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
       (pointerToHeader, pointerToElements) -> Void in
       pointerToElements.deinitialize(count: self.count)
-      pointerToHeader.deinitialize()
+      pointerToHeader.deinitialize(count: 1)
     }
   }
 
@@ -121,7 +122,9 @@ var tests = TestSuite("ManagedBuffer")
 tests.test("basic") {
   do {
     let s = TestManagedBuffer<LifetimeTracked>.create(0)
-    expectEqual(1, LifetimeTracked.instances)
+    withExtendedLifetime(s) {
+      expectEqual(1, LifetimeTracked.instances)
+    }
   }
   
   expectEqual(0, LifetimeTracked.instances)
@@ -191,7 +194,6 @@ tests.test("ManagedBufferPointer") {
     let s = buf!
     expectEqual(0, s.count)
     expectLE(10, s.capacity)
-    expectGE(12, s.capacity)  // allow some over-allocation but not too much
     
     expectEqual(s.count, mgr.header.count.value)
     expectEqual(s.capacity, mgr.header.capacity)
@@ -220,8 +222,9 @@ tests.test("ManagedBufferPointer") {
     expectEqual(mgr.header.capacity, 99)
 
     let s2 = mgr.buffer as! MyBuffer<LifetimeTracked>
-    expectFalse(mgr.isUniqueReference())
-    
+    withExtendedLifetime(s2) {
+      expectFalse(mgr.isUniqueReference())
+    }
     let val = mgr.withUnsafeMutablePointerToHeader { $0 }.pointee
     expectEqual(val.count.value, 0)
     expectEqual(val.capacity, 99)
